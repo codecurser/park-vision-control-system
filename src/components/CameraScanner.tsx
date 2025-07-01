@@ -48,7 +48,7 @@ const CameraScanner = ({ onPlateScanned, isScanning, setIsScanning }: CameraScan
     // Remove all non-alphanumeric characters and convert to uppercase
     let cleaned = text.replace(/[^A-Z0-9]/gi, '').toUpperCase();
     
-    // Common OCR corrections
+    // Common OCR corrections for better accuracy
     cleaned = cleaned
       .replace(/O/g, '0')  // Replace O with 0
       .replace(/I/g, '1')  // Replace I with 1
@@ -61,15 +61,15 @@ const CameraScanner = ({ onPlateScanned, isScanning, setIsScanning }: CameraScan
   };
 
   const isValidPlateNumber = (plateNumber: string): boolean => {
-    // Check if the plate number is between 6-10 characters and contains both letters and numbers
-    if (plateNumber.length < 6 || plateNumber.length > 10) {
+    // More flexible validation - allow 4-10 characters (adjusted for better detection)
+    if (plateNumber.length < 4 || plateNumber.length > 10) {
       return false;
     }
     
-    const hasLetters = /[A-Z]/.test(plateNumber);
-    const hasNumbers = /[0-9]/.test(plateNumber);
+    // Must contain at least one letter or number
+    const hasAlphaNumeric = /[A-Z0-9]/.test(plateNumber);
     
-    return hasLetters && hasNumbers;
+    return hasAlphaNumeric;
   };
 
   const capture = useCallback(async () => {
@@ -99,7 +99,7 @@ const CameraScanner = ({ onPlateScanned, isScanning, setIsScanning }: CameraScan
           // Configure Tesseract for better license plate recognition
           await worker.setParameters({
             tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
-            tessedit_pageseg_mode: '8', // Single word mode
+            tessedit_pageseg_mode: 8, // Fixed: Use number instead of string
             preserve_interword_spaces: '0',
           });
           
@@ -125,7 +125,7 @@ const CameraScanner = ({ onPlateScanned, isScanning, setIsScanning }: CameraScan
             setExtractedText("");
             toast({
               title: "Invalid Plate Format",
-              description: `Detected text: "${cleanedText}" doesn't match license plate format. Please try again with better lighting.`,
+              description: `Detected text: "${cleanedText}" doesn't match expected format. Please try again with better lighting.`,
               variant: "destructive",
             });
           }

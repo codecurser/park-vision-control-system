@@ -34,12 +34,16 @@ export const parkingService = {
 
       console.log('Successfully inserted parking entry:', data);
       
-      return {
-        id: data.id,
-        plate_number: data.plate_number,
-        timestamp: new Date(data.timestamp),
-        entry_type: data.entry_type
-      };
+      if (data) {
+        return {
+          id: data.id,
+          plate_number: data.plate_number,
+          timestamp: new Date(data.timestamp),
+          entry_type: data.entry_type
+        };
+      }
+      
+      return null;
     } catch (error) {
       console.error('Failed to insert parking entry:', error);
       return null;
