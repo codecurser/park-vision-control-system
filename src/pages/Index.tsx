@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
+import { parkingService } from "@/services/parkingService";
 
 export interface ParkingEntry {
   id: string;
@@ -19,58 +20,69 @@ const Index = () => {
   const [activeView, setActiveView] = useState<"scan" | "dashboard">("scan");
   const [parkingEntries, setParkingEntries] = useState<ParkingEntry[]>([]);
   const [isScanning, setIsScanning] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Load entries from localStorage on mount
+  // Load entries from Supabase on mount
   useEffect(() => {
-    const savedEntries = localStorage.getItem("smartpark-entries");
-    if (savedEntries) {
-      const entries = JSON.parse(savedEntries);
-      // Convert timestamp strings back to Date objects
-      const entriesWithDates = entries.map((entry: any) => ({
-        ...entry,
-        timestamp: new Date(entry.timestamp)
-      }));
-      setParkingEntries(entriesWithDates);
-    }
+    loadParkingEntries();
   }, []);
 
-  // Save entries to localStorage whenever entries change
-  useEffect(() => {
-    localStorage.setItem("smartpark-entries", JSON.stringify(parkingEntries));
-  }, [parkingEntries]);
-
-  const addParkingEntry = (plateNumber: string, entryType: "Entry" | "Exit") => {
-    // Check for duplicate entries within 5 minutes
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-    const recentDuplicate = parkingEntries.find(
-      entry => 
-        entry.plate_number === plateNumber && 
-        entry.entry_type === entryType &&
-        entry.timestamp > fiveMinutesAgo
-    );
-
-    if (recentDuplicate) {
+  const loadParkingEntries = async () => {
+    try {
+      setIsLoading(true);
+      const entries = await parkingService.getAllEntries();
+      setParkingEntries(entries);
+      console.log('Loaded parking entries:', entries.length);
+    } catch (error) {
+      console.error('Failed to load parking entries:', error);
       toast({
-        title: "Duplicate Entry Detected",
-        description: `${plateNumber} already has a ${entryType.toLowerCase()} record within the last 5 minutes.`,
+        title: "Failed to Load Data",
+        description: "Could not load parking entries from database",
         variant: "destructive",
       });
-      return;
+    } finally {
+      setIsLoading(false);
     }
+  };
 
-    const newEntry: ParkingEntry = {
-      id: Math.random().toString(36).substr(2, 9),
-      plate_number: plateNumber,
-      timestamp: new Date(),
-      entry_type: entryType,
-    };
+  const addParkingEntry = async (plateNumber: string, entryType: "Entry" | "Exit") => {
+    try {
+      console.log('Adding parking entry:', plateNumber, entryType);
+      
+      // Check for duplicate entries within 5 minutes
+      const isDuplicate = await parkingService.checkDuplicateEntry(plateNumber, entryType);
+      
+      if (isDuplicate) {
+        toast({
+          title: "Duplicate Entry Detected",
+          description: `${plateNumber} already has a ${entryType.toLowerCase()} record within the last 5 minutes.`,
+          variant: "destructive",
+        });
+        return;
+      }
 
-    setParkingEntries(prev => [newEntry, ...prev]);
-    
-    toast({
-      title: "License Plate Scanned",
-      description: `${plateNumber} - ${entryType} recorded successfully`,
-    });
+      // Insert new entry into database
+      const newEntry = await parkingService.insertEntry(plateNumber, entryType);
+      
+      if (newEntry) {
+        // Add to local state for immediate UI update
+        setParkingEntries(prev => [newEntry, ...prev]);
+        
+        toast({
+          title: "License Plate Scanned",
+          description: `${plateNumber} - ${entryType} recorded successfully`,
+        });
+      } else {
+        throw new Error('Failed to insert entry');
+      }
+    } catch (error) {
+      console.error('Failed to add parking entry:', error);
+      toast({
+        title: "Failed to Save Entry",
+        description: "Could not save parking entry to database. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const stats = {
@@ -81,6 +93,17 @@ const Index = () => {
     currentlyParked: parkingEntries.filter(entry => entry.entry_type === "Entry").length -
                     parkingEntries.filter(entry => entry.entry_type === "Exit").length,
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-lg text-gray-600">Loading SmartPark...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
