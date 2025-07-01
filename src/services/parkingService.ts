@@ -39,7 +39,7 @@ export const parkingService = {
           id: data.id,
           plate_number: data.plate_number,
           timestamp: new Date(data.timestamp),
-          entry_type: data.entry_type
+          entry_type: data.entry_type as "Entry" | "Exit"
         };
       }
       
@@ -70,7 +70,7 @@ export const parkingService = {
         id: entry.id,
         plate_number: entry.plate_number,
         timestamp: new Date(entry.timestamp),
-        entry_type: entry.entry_type
+        entry_type: entry.entry_type as "Entry" | "Exit"
       }));
     } catch (error) {
       console.error('Failed to fetch parking entries:', error);
